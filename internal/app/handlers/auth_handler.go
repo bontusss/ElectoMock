@@ -2,58 +2,37 @@ package handlers
 
 import (
 	"electomock/internal/app/services"
-	"github.com/gin-contrib/sessions"
+	"net/http"
+
 	"github.com/gin-gonic/gin"
 )
 
 type AuthHandler struct {
-	authService *services.AuthService
+	service services.AuthService
 }
 
-func NewAuthhandler(authService *services.AuthService) *AuthHandler {
-	return &AuthHandler{authService: authService}
-}
-func (h AuthHandler) HomeHandler(c *gin.Context) {
-	c.HTML(200, "home.html", gin.H{"app_name": "ElectoMock"})
+func NewAuthService(service services.AuthService) *AuthHandler {
+	return &AuthHandler{service: service}
 }
 
-func (h AuthHandler) LoginPage(c *gin.Context) {
-	c.HTML(200, "auth/login.html", gin.H{"title": "login"})
-}
-
-func (h AuthHandler) Login(c *gin.Context) {
-	var form struct {
-		Email    string `form:"email" binding:"required,email"`
-		Password string `form:"password" binding:"required"`
+func (a *AuthHandler) Register(c *gin.Context) {
+	var input struct {
+		Name     string `json:"name" binding:"required"`
+		Email    string `json:"email" binding:"required,email"`
+		Password string `json:"password" binding:"required,min=6"`
 	}
 
-	if err := c.ShouldBind(&form); err != nil {
-		c.HTML(400, "auth/login.html", gin.H{
-			"error": "invalid form data.",
+	if err := c.ShouldBind(&input); err != nil {
+		c.HTML(http.StatusBadRequest, "auth/register.html", gin.H{
+			"error": "Invalid input, Please chheck your details.",
 		})
 		return
 	}
-	user, err := h.authService.Login(form.Email, form.Password)
-	if err != nil {
-		c.HTML(401, "auth/login.html", gin.H{
-			"error": "invalid credentials.",
+	if err := a.service.Register(input.Name, input.Email, input.Password); err != nil {
+		c.HTML(http.StatusBadRequest, "auth/register.html", gin.H{
+			"error": err.Error(),
 		})
 		return
 	}
-	session := sessions.Default(c)
-	session.Set("user_id", user.ID)
-	err = session.Save()
-	if err != nil {
-		c.HTML(500, "auth/login.html", gin.H{
-			"error": "An error occurred, try again.",
-		})
-		return
-	}
-
-	// todo: redirect to homepage, change it to user dashboard when implemented.
-	c.Redirect(302, "/")
-}
-
-func (h AuthHandler) GoogleLogin(c *gin.Context) {
-	url := h.authService.
+	c.Redirect(http.StatusOK, "/")
 }
